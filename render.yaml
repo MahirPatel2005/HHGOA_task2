@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: vaani-rag-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -e ".[production]"
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: OLLAMA_API_KEY
+        sync: false
+      - key: OLLAMA_MODEL
+        value: gpt-oss:120b
+      - key: OLLAMA_BASE_URL
+        value: https://ollama.com
+      - key: GENERATION_TIMEOUT_S
+        value: "30"
+      - key: GENERATION_PROVIDER
+        value: ollama
+      - key: SARVAM_MODEL
+        value: saaras:v4
+      - key: HF_TOKEN
+        sync: false
+      - key: VECTOR_BACKEND
+        value: qdrant
+      - key: EMBEDDING_BACKEND
+        value: hash
+      - key: EMBEDDING_MODEL
+        value: intfloat/multilingual-e5-small
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: voice_rag_demo
+      - key: QDRANT_BATCH_SIZE
+        value: "64"
+      - key: QDRANT_TIMEOUT_S
+        value: "120"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: RATE_LIMIT_QUERY_PER_MINUTE
+        value: "30"
+      - key: RATE_LIMIT_VOICE_PER_MINUTE
+        value: "10"
+      - key: MAX_CONCURRENT_REQUESTS
+        value: "4"
+      - key: MAX_AUDIO_BYTES
+        value: "10485760"

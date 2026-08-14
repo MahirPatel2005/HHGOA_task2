@@ -1,0 +1,28 @@
+{"query": "কৰ্পোৰেচন কি?", "dataset_config": "as", "dataset_split": "validation", "query_id": 1102432}
+{"query": "ৰেচেল কাৰ্চনে কিয় এক বাধ্যবাধকতা সহ্য কৰিবলৈ লিখিছিল", "dataset_config": "as", "dataset_split": "validation", "query_id": 1102431}
+{"query": "কর্পোরেশন কী?", "dataset_config": "bn", "dataset_split": "validation", "query_id": 1102432}
+{"query": "র‍্যাচেল কারসন কেন একটি বাধ্যবাধকতা সহ্য করার জন্য লিখেছিলেন", "dataset_config": "bn", "dataset_split": "validation", "query_id": 1102431}
+{"query": ". શું એક કોર્પોરેશન છે?", "dataset_config": "gu", "dataset_split": "validation", "query_id": 1102432}
+{"query": "રશેલ કાર્સને શા માટે સહન કરવાની જવાબદારી લખી?", "dataset_config": "gu", "dataset_split": "validation", "query_id": 1102431}
+{"query": "कॉर्पोरेशन क्या है?", "dataset_config": "hi", "dataset_split": "validation", "query_id": 1102432}
+{"query": "रेचल कार्सन ने क्यों एक दायित्व बर्दाश्त करने के लिए लिखा", "dataset_config": "hi", "dataset_split": "validation", "query_id": 1102431}
+{"query": ". ಕಾರ್ಪೊರೇಷನ್ ಎಂದರೇನು?", "dataset_config": "kn", "dataset_split": "validation", "query_id": 1102432}
+{"query": "ರಾಚೆಲ್ ಕಾರ್ಸನ್ ಅವರು ಸಹಿಸಿಕೊಳ್ಳಬೇಕಾದ ಒಂದು ಬಾಧ್ಯತೆಯನ್ನು ಏಕೆ ಬರೆದರು?", "dataset_config": "kn", "dataset_split": "validation", "query_id": 1102431}
+{"query": "ഒരു കോർപ്പറേഷൻ എന്താണ്?", "dataset_config": "ml", "dataset_split": "validation", "query_id": 1102432}
+{"query": "റേച്ചൽ കാർസൺ എന്തുകൊണ്ട് സഹിക്കാനുള്ള ഒരു ബാധ്യത എഴുതിയത്?", "dataset_config": "ml", "dataset_split": "validation", "query_id": 1102431}
+{"query": "कॉर्पोरेशन म्हणजे काय?", "dataset_config": "mr", "dataset_split": "validation", "query_id": 1102432}
+{"query": "रॅचेल कार्सनला काय करावे लागले असे लिहिले गेले का?", "dataset_config": "mr", "dataset_split": "validation", "query_id": 1102431}
+{"query": "के हो निगम?", "dataset_config": "ne", "dataset_split": "validation", "query_id": 1102432}
+{"query": "राचेल कार्सनले किन सहन गर्ने दायित्व लेख्नु भयो", "dataset_config": "ne", "dataset_split": "validation", "query_id": 1102431}
+{"query": ". ଏକ କର୍ପୋରେସନ୍ କ'ଣ?", "dataset_config": "or", "dataset_split": "validation", "query_id": 1102432}
+{"query": "ରାଚେଲ କାର୍ସନ କାହିଁକି ଏକ ବାଧ୍ୟତା ସହିତ ଏକ ଦାୟିତ୍ୱ ଲେଖିଲେ?", "dataset_config": "or", "dataset_split": "validation", "query_id": 1102431}
+{"query": ". ਕੋਰਪੋਰੇਸ਼ਨ ਕੀ ਹੈ?", "dataset_config": "pa", "dataset_split": "validation", "query_id": 1102432}
+{"query": "ਰੇਚਲ ਕਾਰਸਨ ਨੇ ਇੱਕ ਜ਼ਿੰਮੇਵਾਰੀ ਕਿਉਂ ਲਿਖੀ ਸੀ।", "dataset_config": "pa", "dataset_split": "validation", "query_id": 1102431}
+{"query": "कार्पोरेशन् किमिति?", "dataset_config": "sa", "dataset_split": "validation", "query_id": 1102432}
+{"query": "रेचेल् कार्सन् इत्यनेन किमर्थं दायित्वं सोढव्यम् इति लिखितम्।", "dataset_config": "sa", "dataset_split": "validation", "query_id": 1102431}
+{"query": "ஒரு நிறுவனம் என்பது என்ன?", "dataset_config": "ta", "dataset_split": "validation", "query_id": 1102432}
+{"query": "ஏன் ரேச்சல் கார்சன் ஒரு கடமையை நிறைவேற்ற வேண்டும் என்று எழுதினார்", "dataset_config": "ta", "dataset_split": "validation", "query_id": 1102431}
+{"query": "కార్పొరేషన్ అంటే ఏమిటి?", "dataset_config": "te", "dataset_split": "validation", "query_id": 1102432}
+{"query": "రాచెల్ కార్సన్ ఎందుకు సహించాల్సిన బాధ్యతను వ్రాశారు", "dataset_config": "te", "dataset_split": "validation", "query_id": 1102431}
+{"query": "کارپوریشن کیا ہے؟", "dataset_config": "ur", "dataset_split": "validation", "query_id": 1102432}
+{"query": "کیا راحیل کارسن نے برداشت کرنے کی ذمہ داری کیوں لکھی؟", "dataset_config": "ur", "dataset_split": "validation", "query_id": 1102431}

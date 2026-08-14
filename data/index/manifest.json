@@ -1,0 +1,16 @@
+{
+  "strategies": [
+    "fixed_size",
+    "semantic",
+    "metadata_aware",
+    "structural"
+  ],
+  "counts": {
+    "fixed_size": 106,
+    "semantic": 134,
+    "metadata_aware": 106,
+    "structural": 106
+  },
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+  "built_at": "2026-08-14T08:55:19Z"
+}

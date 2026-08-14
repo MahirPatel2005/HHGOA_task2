@@ -1,0 +1,58 @@
+name: Build cloud demo index
+
+on:
+  workflow_dispatch:
+    inputs:
+      rows_per_language:
+        description: "Rows from each MSMARCO-XI language (100 is recommended)"
+        required: true
+        default: "100"
+        type: string
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      QDRANT_BATCH_SIZE: "16"
+      QDRANT_TIMEOUT_S: "300"
+      HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install production dependencies
+        run: python -m pip install -e ".[production]"
+
+      - name: Build all-language cloud index
+        run: >-
+          python scripts/ingest.py
+          --dataset ai4bharat/MSMARCO-XI
+          --all-configs
+          --split validation
+          --limit "${{ inputs.rows_per_language }}"
+          --backend sentence-transformers
+          --model intfloat/multilingual-e5-small
+          --vector-backend qdrant
+          --qdrant-collection voice_rag_demo
+          --batch-size 16
+          --eval-queries benchmarks/msmarco_xi_eval.jsonl
+          --eval-count 500
+          --out-index storage/cloud-index.json
+
+      - name: Upload index manifest and evaluation queries
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-index-manifest
+          path: |
+            storage/cloud-index.manifest.json
+            benchmarks/msmarco_xi_eval.jsonl
