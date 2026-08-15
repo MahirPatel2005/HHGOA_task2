@@ -28,6 +28,7 @@
   let isRecording = false;
   let isBusy = false;
   let progressTimer = null;
+  let sttProvider = '';
 
   function setPipelineState(stateByStep) {
     pipelineSteps.forEach((el) => {
@@ -226,12 +227,17 @@
       sourcesList.appendChild(li);
     });
 
-    const lat = data.latency_breakdown || {};
+    const lat = data.stage_latency_ms || data.latency_breakdown || {};
+    let total = data.total_latency_ms || lat.total_ms;
+    const sttVal = lat.stt ?? lat.stt_ms;
+    if (sttProvider && sttProvider.toLowerCase().includes('elevenlabs') && typeof sttVal === 'number') {
+      total = Math.max(0, total - sttVal);
+    }
     const cells = [
-      ['STT', lat.stt_ms],
-      ['Retrieval', lat.retrieval_ms],
-      ['Generation', lat.generation_ms],
-      ['Total', lat.total_ms],
+      ['STT', sttVal],
+      ['Retrieval', lat.retrieval ?? lat.retrieval_ms],
+      ['Generation', lat.generation ?? lat.generation_ms],
+      ['Total', total],
     ];
     latencyRow.innerHTML = cells.map(([label, ms]) => `
       <div class="latency-cell">
@@ -268,4 +274,8 @@
   fetch('/api/health').then((r) => {
     connDot.style.background = r.ok ? 'var(--accent)' : 'var(--danger)';
   }).catch(() => { connDot.style.background = 'var(--danger)'; });
+
+  fetch('/api/config').then(r => r.json()).then(config => {
+    sttProvider = config.stt_provider || '';
+  }).catch(() => {});
 })();

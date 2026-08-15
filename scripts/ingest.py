@@ -155,11 +155,11 @@ def load_msmarco_xi_sample_rows(dataset: str, config: str, split: str, limit: in
     columns = ["source_lang", "target_lang", "Answer", "query_id", "query_type", "passages", "Eng_Query", "Eng_Answer", "query"]
     print(f"Connecting to DuckDB to stream sample rows from {parquet_url.split('/')[-1]}...")
     import time
-    for attempt in range(1, 4):
+    for attempt in range(1, 6):
         try:
             con = duckdb.connect()
-            con.execute("SET http_timeout = 20000;")
-            con.execute("SET http_retries = 3;")
+            con.execute("SET http_timeout = 5000;")
+            con.execute("SET http_retries = 5;")
             schema = con.sql(f"SELECT * FROM read_parquet('{parquet_url}') LIMIT 0")
             available = set(schema.columns)
             selected = [col for col in columns if col in available]
@@ -174,10 +174,13 @@ def load_msmarco_xi_sample_rows(dataset: str, config: str, split: str, limit: in
                 yield row
             break
         except Exception as ex:
-            if attempt == 3:
+            ex_str = str(ex).lower()
+            if "404" in ex_str or "not found" in ex_str:
+                raise ex
+            if attempt == 5:
                 raise RuntimeError(f"Error querying remote Parquet via DuckDB: {ex}")
-            print(f"Warning: connection attempt {attempt} failed ({ex}). Retrying in 5 seconds...", file=sys.stderr)
-            time.sleep(5)
+            print(f"Warning: connection attempt {attempt} failed ({ex}). Retrying in 2 seconds...", file=sys.stderr)
+            time.sleep(2)
 
 
 def load_rows_from_huggingface(dataset: str, config: str | None, split: str, limit: int | None) -> Iterable[dict[str, Any]]:
@@ -238,6 +241,18 @@ def upsert_document_batch(store, chunker: MultiStrategyChunker, embedder, docume
     return len(documents), len(chunks)
 
 
+def fetch_config_worker(args_tuple):
+    dataset, config, split, limit = args_tuple
+    try:
+        import sys
+        rows = list(load_msmarco_xi_sample_rows(dataset, config, split, limit))
+        return config, rows
+    except Exception as ex:
+        import sys
+        print(f"Warning: failed to fetch configuration '{config}' ({ex}). Skipping this configuration.", file=sys.stderr)
+        return config, []
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build the multi-strategy voice-RAG index")
     source = parser.add_mutually_exclusive_group(required=True)
@@ -277,12 +292,26 @@ def main() -> int:
             parser.error("--all-configs currently targets ai4bharat/MSMARCO-XI")
         configs_used = list(MSMARCO_XI_CONFIGS)
 
-        def all_config_rows():
-            for split in selected_splits:
-                for config in MSMARCO_XI_CONFIGS:
-                    yield from load_rows_from_huggingface(args.dataset, config, split, args.limit)
+        import multiprocessing
+        pool_args = []
+        for split in selected_splits:
+            for config in MSMARCO_XI_CONFIGS:
+                pool_args.append((args.dataset, config, split, args.limit))
 
-        rows = all_config_rows()
+        print(f"Spawning parallel processes to download {len(pool_args)} configurations concurrently...")
+        # Enable multiprocessing spawn method to make it clean on macOS
+        try:
+            multiprocessing.set_start_method("spawn", force=True)
+        except RuntimeError:
+            pass
+
+        with multiprocessing.Pool(processes=len(pool_args)) as pool:
+            results = pool.map(fetch_config_worker, pool_args)
+
+        combined_rows = []
+        for config, rows_list in results:
+            combined_rows.extend(rows_list)
+        rows = combined_rows
     else:
         configs_used = [args.config] if args.config else []
 

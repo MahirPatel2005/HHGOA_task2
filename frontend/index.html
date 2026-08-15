@@ -287,9 +287,16 @@
     input:focus, select:focus { box-shadow: 4px 4px 0 var(--ink); transform: translate(-2px,-2px); }
     .ask-button, .clear-button { border: var(--line); background: var(--ink); color: var(--sun-light); padding: 11px 16px; font: 700 11px var(--mono); text-transform: uppercase; transition: transform .15s; }
     .ask-button:hover, .clear-button:hover { transform: rotate(-2deg) translateY(-2px); }
-    .control-row { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr auto; gap: 9px; margin-top: 10px; }
+    .control-row { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr auto; gap: 9px; margin-top: 10px; }
     .control-row select { background: var(--paper); }
     .clear-button { background: transparent; color: var(--ink); }
+    .toggle-row { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 9px; margin-top: 18px; border: var(--line); background: rgba(255,255,255,.24); padding: 8px 12px; }
+    .toggle-label { font: 700 9px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+    .toggle-group { display: flex; gap: 6px; }
+    .toggle-option { cursor: pointer; position: relative; display: inline-block; }
+    .toggle-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-btn { display: inline-block; border: 2px solid var(--ink); background: var(--paper); color: var(--ink); padding: 5px 9px; font: 700 9px var(--mono); text-transform: uppercase; transition: background .15s, transform .15s; }
+    .toggle-option input:checked + .toggle-btn { background: var(--hh-green); color: var(--hh-yellow); box-shadow: 2px 2px 0 var(--ink); transform: translate(-1px, -1px); }
     .transcript-box { position: relative; z-index: 2; min-height: 46px; margin-top: 16px; padding: 11px 13px; border: 2px solid var(--ink); background: rgba(255,255,255,.34); font: 600 13px/1.35 var(--round); }
     .transcript-box .label { display: block; font: 700 9px var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; opacity: .65; }
 
@@ -594,9 +601,22 @@
             <div class="card-top"><span class="card-index">01</span><span class="state" id="recordState">READY</span></div>
             <h2 class="card-title">RECORD<br>YOUR<br>QUESTION</h2>
             <p class="card-help">Say it like you mean it. Sarvam Saaras transcribes the audio, then the retrieval harness gets to work.</p>
+            <div class="toggle-row">
+              <span class="toggle-label">Recognition Mode</span>
+              <div class="toggle-group">
+                <label class="toggle-option">
+                  <input type="radio" name="stt_source" value="cloud" checked>
+                  <span class="toggle-btn">Cloud STT</span>
+                </label>
+                <label class="toggle-option">
+                  <input type="radio" name="stt_source" value="browser">
+                  <span class="toggle-btn">Browser Speech</span>
+                </label>
+              </div>
+            </div>
             <button class="record-button" id="recordBtn" type="button"><span><span class="button-dot">●</span> START RECORDING</span><span>↗</span></button>
             <div class="wave" id="wave" aria-hidden="true"></div>
-            <div class="control-row"><select id="language" aria-label="Speech language"><option value="unknown">AUTO-DETECT LANGUAGE</option><option value="en-IN">ENGLISH</option><option value="as-IN">ASSAMESE</option><option value="bn-IN">BENGALI</option><option value="gu-IN">GUJARATI</option><option value="hi-IN">हिन्दी · HINDI</option><option value="kn-IN">KANNADA</option><option value="ml-IN">MALAYALAM</option><option value="mr-IN">MARATHI</option><option value="ne-IN">NEPALI</option><option value="od-IN">ODIA</option><option value="pa-IN">PUNJABI</option><option value="sa-IN">SANSKRIT</option><option value="ta-IN">தமிழ் · TAMIL</option><option value="te-IN">TELUGU</option><option value="ur-IN">URDU</option></select><button class="clear-button" id="clearBtn" type="button">CLEAR ↺</button></div>
+            <div class="control-row"><select id="language" aria-label="Speech language"><option value="unknown">AUTO-DETECT LANGUAGE</option><option value="en-IN">ENGLISH</option><option value="as-IN">ASSAMESE</option><option value="bn-IN">BENGALI</option><option value="gu-IN">GUJARATI</option><option value="hi-IN">हिन्दी · HINDI</option><option value="kn-IN">KANNADA</option><option value="ml-IN">MALAYALAM</option><option value="mr-IN">MARATHI</option><option value="ne-IN">NEPALI</option><option value="od-IN">ODIA</option><option value="pa-IN">PUNJABI</option><option value="sa-IN">SANSKRIT</option><option value="ta-IN">தமிழ் · TAMIL</option><option value="te-IN">TELUGU</option><option value="ur-IN">URDU</option></select><select id="mode" aria-label="Answer Mode"><option value="generative">GENERATIVE (LLM)</option><option value="fast">FAST (EXTRACTIVE)</option></select><button class="clear-button" id="clearBtn" type="button">CLEAR ↺</button></div>
             <div class="transcript-box" id="transcript"><span class="label">TRANSCRIPT</span>Waiting for a voice or a typed question.</div>
             <form class="input-line" id="queryForm"><input id="queryInput" placeholder="Type a question instead…" autocomplete="off" aria-label="Type your question"><button class="ask-button" type="submit">ASK →</button></form>
           </article>
@@ -671,7 +691,171 @@
       const $ = id => document.getElementById(id);
       const wave = $('wave');
       for (let i = 0; i < 34; i++) { const bar = document.createElement('i'); bar.className = 'bar'; wave.appendChild(bar); }
-      let recorder = null, chunks = [], recording = false;
+      let recorder = null, chunks = [], recording = false, sttProvider = '';
+      let connection = null, voiceBuffer = '', livePartial = '', autoSendTimer = null;
+      const AUTO_SEND_AFTER_COMMIT_MS = 650;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      async function fetchScribeToken() {
+        const res = await fetch(api('/api/voice/scribe-token'));
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Token request failed (${res.status})`);
+        }
+        const data = await res.json();
+        if (!data.token) throw new Error("No token in response");
+        return data.token;
+      }
+      function cancelAutoSend() {
+        if (autoSendTimer !== null) { clearTimeout(autoSendTimer); autoSendTimer = null; }
+      }
+      function closeScribeMic({ silent = false } = {}) {
+        const active = connection;
+        connection = null;
+        if (active) active.close();
+        recording = false;
+        $('recordBtn').classList.remove('recording');
+        $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>';
+        wave.classList.remove('is-recording');
+      }
+      function scheduleAutoSend() {
+        cancelAutoSend();
+        autoSendTimer = setTimeout(() => { autoSendTimer = null; sendScribeQuestion(); }, AUTO_SEND_AFTER_COMMIT_MS);
+      }
+      function sendScribeQuestion() {
+        cancelAutoSend();
+        const q = (voiceBuffer || '').trim();
+        if (!q) return;
+        closeScribeMic({ silent: true });
+        sendText(q);
+      }
+      async function startScribe() {
+        cancelAutoSend();
+        voiceBuffer = '';
+        livePartial = '';
+        setStatus('FETCHING TOKEN…');
+        try {
+          const token = await fetchScribeToken();
+          const { Scribe, RealtimeEvents } = await import("https://esm.sh/@elevenlabs/client@1.17.0");
+          const options = {
+            token,
+            modelId: "scribe_v2_realtime",
+            commitStrategy: "vad",
+            vadSilenceThresholdSecs: 1.6,
+            vadThreshold: 0.5,
+            minSpeechDurationMs: 500,
+            minSilenceDurationMs: 1600,
+            includeTimestamps: true,
+            noVerbatim: true,
+            includeLanguageDetection: true,
+            keyterms: ["Goa", "Konkan", "India", "MS MARCO"],
+            microphone: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          };
+          const selectedLang = $('language').value;
+          if (selectedLang && selectedLang !== 'unknown') {
+            options.languageCode = selectedLang.split('-')[0];
+          } else {
+            options.secondaryLanguages = ["en", "hi", "bn", "mr", "ta", "te", "gu", "kn", "ml", "pa", "as", "or", "ne", "ur", "sa"];
+          }
+          const currentConnection = Scribe.connect(options);
+          connection = currentConnection;
+          currentConnection.on(RealtimeEvents.SESSION_STARTED, () => {
+            recording = true;
+            $('recordBtn').classList.add('recording');
+            $('recordBtn').innerHTML = '<span><span class="button-dot">■</span> STOP RECORDING</span><span>↗</span>';
+            wave.classList.add('is-recording');
+            setStatus('SPEAK NOW…');
+          });
+          currentConnection.on(RealtimeEvents.PARTIAL_TRANSCRIPT, (data) => {
+            if (connection !== currentConnection) return;
+            const text = (data.text || '').trim();
+            if (!text) return;
+            livePartial = text;
+            setTranscript(`${voiceBuffer} ${livePartial}`.trim(), 'TRANSCRIPT (LIVE)');
+            setStatus('LISTENING…');
+          });
+          currentConnection.on(RealtimeEvents.COMMITTED_TRANSCRIPT, (data) => {
+            if (connection !== currentConnection) return;
+            const text = (data.text || '').trim();
+            livePartial = '';
+            if (!text) return;
+            voiceBuffer = `${voiceBuffer} ${text}`.trim();
+            setTranscript(voiceBuffer, 'TRANSCRIPT (LIVE)');
+            scheduleAutoSend();
+          });
+          currentConnection.on(RealtimeEvents.ERROR, (error) => {
+            if (connection !== currentConnection) return;
+            setStatus(`ERROR: ${error?.message || error}`, true);
+          });
+          currentConnection.on(RealtimeEvents.CLOSE, () => {
+            if (connection === currentConnection) {
+              connection = null;
+              recording = false;
+              $('recordBtn').classList.remove('recording');
+              $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>';
+              wave.classList.remove('is-recording');
+            }
+          });
+        } catch (error) {
+          setStatus('SCRIBE CONNECTION FAILED', true);
+          $('answer').textContent = error.message;
+          recording = false;
+          $('recordBtn').classList.remove('recording');
+          $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>';
+          wave.classList.remove('is-recording');
+        }
+      }
+      function stopScribe() {
+        const q = `${voiceBuffer} ${livePartial}`.trim();
+        if (q) {
+          voiceBuffer = q;
+          sendScribeQuestion();
+        } else {
+          closeScribeMic({ silent: true });
+          setStatus('WAITING');
+        }
+      }
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+          recording = true;
+          $('recordBtn').classList.add('recording');
+          $('recordBtn').innerHTML = '<span><span class="button-dot">■</span> STOP RECORDING</span><span>↗</span>';
+          wave.classList.add('is-recording');
+          setStatus('LISTENING (BROWSER)…');
+        };
+
+        recognition.onresult = event => {
+          const transcript = event.results[0][0].transcript;
+          setTranscript(transcript, 'TRANSCRIPT (BROWSER)');
+          sendText(transcript);
+        };
+
+        recognition.onerror = event => {
+          console.error('Speech recognition error', event);
+          if (event.error !== 'no-speech') {
+            setStatus('RECOGNITION ERROR', true);
+            $('answer').textContent = `Speech recognition error: ${event.error}`;
+          }
+        };
+
+        recognition.onend = () => {
+          recording = false;
+          $('recordBtn').classList.remove('recording');
+          $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>';
+          wave.classList.remove('is-recording');
+          if ($('statusText').textContent.startsWith('LISTENING')) {
+            setStatus('WAITING');
+          }
+        };
+      }
 
       function setStatus(text, warn = false) {
         $('statusText').textContent = text.toUpperCase();
@@ -686,7 +870,11 @@
       function formatMs(value) { return `${Number(value || 0).toFixed(1)} ms`; }
       function renderMetrics(result) {
         const timings = result.stage_latency_ms || {};
-        const entries = [['total', result.total_latency_ms], ['retrieval', timings.retrieval], ['generation', timings.generation || timings.generation_fallback], ['guardrails', (timings.input_guardrails || 0) + (timings.answer_guardrails || 0)]];
+        let total = result.total_latency_ms;
+        if (sttProvider && sttProvider.toLowerCase().includes('elevenlabs') && typeof timings.stt === 'number') {
+          total = Math.max(0, total - timings.stt);
+        }
+        const entries = [['total', total], ['retrieval', timings.retrieval], ['generation', timings.generation || timings.generation_fallback], ['guardrails', (timings.input_guardrails || 0) + (timings.answer_guardrails || 0)]];
         $('metrics').replaceChildren();
         entries.forEach(([name, value]) => { const card = document.createElement('div'); card.className = 'metric'; const b = document.createElement('b'); b.textContent = value == null ? (name === 'guardrails' ? 'ON' : 'READY') : formatMs(value); const span = document.createElement('span'); span.textContent = name; card.append(b, span); $('metrics').append(card); });
       }
@@ -715,13 +903,55 @@
       async function sendText(query) {
         if (!query.trim()) return;
         setStatus('SEARCHING…'); $('answer').textContent = 'Finding the right passages…'; $('answer').dataset.status = 'waiting';
-        try { const response = await fetch(api('/api/query'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ query, language_code: $('language').value }) }); renderResult(await response.json()); }
+        try { const response = await fetch(api('/api/query'), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ query, language_code: $('language').value, mode: $('mode').value }) }); renderResult(await response.json()); }
         catch (error) { setStatus('REQUEST FAILED', true); $('answer').textContent = error.message; $('answer').dataset.status = 'blocked'; }
       }
       $('queryForm').addEventListener('submit', event => { event.preventDefault(); sendText($('queryInput').value); });
       $('clearBtn').addEventListener('click', () => { $('queryInput').value = ''; setTranscript('Waiting for a voice or a typed question.'); $('answer').textContent = 'Your answer will land here. Ask about the indexed corpus and we’ll show you the receipts.'; $('answer').dataset.status = 'waiting'; $('requestId').textContent = '—'; renderMetrics({}); renderSources([]); setStatus('WAITING'); });
       $('recordBtn').addEventListener('click', async () => {
-        if (recording) { recorder.stop(); recording = false; $('recordBtn').classList.remove('recording'); $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>'; setStatus('UPLOADING AUDIO…'); return; }
+        const useBrowser = document.querySelector('input[name="stt_source"]:checked')?.value === 'browser';
+
+        if (sttProvider === "ElevenLabs STT" && !useBrowser) {
+          if (recording) {
+            stopScribe();
+          } else {
+            await startScribe();
+          }
+          return;
+        }
+
+        if (useBrowser) {
+          if (!SpeechRecognition) {
+            setStatus('BROWSER SPEECH UNSUPPORTED', true);
+            $('answer').textContent = 'This browser does not support the Web Speech API. Please switch to Cloud STT or try Chrome/Safari.';
+            return;
+          }
+          if (recording) {
+            recognition.stop();
+            return;
+          }
+          const selectedLang = $('language').value;
+          recognition.lang = selectedLang === 'unknown' ? 'en-IN' : selectedLang;
+          try {
+            recognition.start();
+          } catch (error) {
+            console.error(error);
+            recognition.stop();
+          }
+          return;
+        }
+
+        if (recording) {
+          if (recorder && recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+          recording = false;
+          $('recordBtn').classList.remove('recording');
+          $('recordBtn').innerHTML = '<span><span class="button-dot">●</span> START RECORDING</span><span>↗</span>';
+          wave.classList.remove('is-recording');
+          setStatus('UPLOADING AUDIO…');
+          return;
+        }
         if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setStatus('MICROPHONE UNAVAILABLE', true); $('answer').textContent = 'This browser does not expose MediaRecorder. Use the typed question box.'; return; }
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -730,7 +960,14 @@
           const mimeType = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
           recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
           recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
-          recorder.onerror = () => { stream.getTracks().forEach(track => track.stop()); recording = false; setStatus('RECORDING FAILED', true); $('answer').textContent = 'The browser could not create an audio recording. Try Chrome or Edge.'; };
+          recorder.onerror = () => {
+            stream.getTracks().forEach(track => track.stop());
+            recording = false;
+            $('recordBtn').classList.remove('recording');
+            wave.classList.remove('is-recording');
+            setStatus('RECORDING FAILED', true);
+            $('answer').textContent = 'The browser could not create an audio recording. Try Chrome or Edge.';
+          };
           recorder.onstop = async () => {
             stream.getTracks().forEach(track => track.stop());
             const actualType = recorder.mimeType || mimeType || 'audio/webm';
@@ -745,12 +982,17 @@
               renderResult(result);
             } catch (error) { setStatus('VOICE REQUEST FAILED', true); $('answer').textContent = error.message; }
           };
-          recorder.start(); recording = true; $('recordBtn').classList.add('recording'); $('recordBtn').innerHTML = '<span><span class="button-dot">■</span> STOP RECORDING</span><span>↗</span>'; setStatus('LISTENING…');
+          recorder.start();
+          recording = true;
+          $('recordBtn').classList.add('recording');
+          $('recordBtn').innerHTML = '<span><span class="button-dot">■</span> STOP RECORDING</span><span>↗</span>';
+          wave.classList.add('is-recording');
+          setStatus('LISTENING…');
         } catch (error) { setStatus('MIC PERMISSION REQUIRED', true); $('answer').textContent = error.message; }
       });
       function tickClock() { const now = new Date(); const value = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); if ($('clock')) $('clock').textContent = value; if ($('footerTime')) $('footerTime').textContent = `LOCAL LAB · ${value}`; }
       tickClock(); setInterval(tickClock, 1000);
-      fetch(api('/api/config')).then(response => response.json()).then(config => { $('configBadge').textContent = 'SARVAM STT · GPT RAG'; $('configBadge').title = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'GENERATOR'}`; }).catch(() => { $('configBadge').textContent = 'LOCAL DEMO'; });
+      fetch(api('/api/config')).then(response => response.json()).then(config => { sttProvider = config.stt_provider || ''; $('configBadge').textContent = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'RAG'}`; $('configBadge').title = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'GENERATOR'}`; }).catch(() => { $('configBadge').textContent = 'LOCAL DEMO'; });
       window.addEventListener('pointermove', event => { document.documentElement.style.setProperty('--mx', `${event.clientX}px`); document.documentElement.style.setProperty('--my', `${event.clientY}px`); });
       const art = document.querySelector('.hero-art'); window.addEventListener('pointermove', event => { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; const x = (event.clientX / window.innerWidth - .5) * 8; const y = (event.clientY / window.innerHeight - .5) * 8; art.style.transform = `translate(${x}px, ${y}px)`; });
     })();

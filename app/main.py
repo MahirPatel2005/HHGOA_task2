@@ -46,6 +46,7 @@ class TextQuery(BaseModel):
 
     query: str = Field(min_length=1, max_length=2000)
     language_code: str = Field(default="unknown", max_length=32)
+    mode: str = Field(default="generative", max_length=32)
 
 
 def load_jsonl_documents(path: Path) -> list[Document]:
@@ -234,7 +235,7 @@ def create_app(orchestrator: RAGOrchestrator | None = None) -> FastAPI:
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self' 'unsafe-inline'; connect-src 'self' https:; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'",
+            "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; script-src 'self' 'unsafe-inline' https://esm.sh https://*.esm.sh data:; connect-src 'self' https: wss:; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'",
         )
         if request.url.scheme == "https":
             response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -339,6 +340,42 @@ def create_app(orchestrator: RAGOrchestrator | None = None) -> FastAPI:
             "security": {"rate_limits": True, "max_audio_bytes": max_audio_bytes},
         }
 
+    @app.get("/api/voice/scribe-token")
+    async def get_scribe_token(request: Request):
+        api_key = os.getenv("ELEVENLABS_API_KEY")
+        if not api_key:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "error": "ElevenLabs STT is not configured."}
+            )
+        url = "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe"
+        headers = {
+            "xi-api-key": api_key,
+            "Content-Type": "application/json",
+        }
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, headers=headers)
+            if response.status_code >= 400:
+                return JSONResponse(
+                    status_code=502,
+                    content={"status": "error", "error": f"ElevenLabs token error ({response.status_code}): {response.text}"}
+                )
+            data = response.json()
+            token = data.get("token")
+            if not token:
+                return JSONResponse(
+                    status_code=502,
+                    content={"status": "error", "error": "Invalid token payload received."}
+                )
+            return {"token": token}
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "error": f"Failed to retrieve scribe token: {str(exc)}"}
+            )
+
     @app.post("/api/query", response_model=PipelineResponse)
     def query(payload: TextQuery, request: Request):
         limited = rate_limit_response(query_limiter, request)
@@ -355,7 +392,13 @@ def create_app(orchestrator: RAGOrchestrator | None = None) -> FastAPI:
                     content={"status": "error", "answer": "The RAG service is still starting.", "error": public_error("pipeline_startup_failed")},
                     headers={"Retry-After": "15"},
                 )
-            return active_pipeline.run(PipelineRequest(query_text=payload.query, language_code=payload.language_code))
+            return active_pipeline.run(
+                PipelineRequest(
+                    query_text=payload.query,
+                    language_code=payload.language_code,
+                    metadata={"mode": payload.mode},
+                )
+            )
         finally:
             slots.release()
 

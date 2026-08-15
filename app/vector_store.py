@@ -20,20 +20,52 @@ class LocalVectorStore:
     def __init__(self, dim: int):
         self.dim = dim
         self.records: dict[str, tuple[list[float], Chunk]] = {}
+        self._matrix = None
+        self._chunks = []
+        self._norms = None
+
+    def _build_cache(self) -> None:
+        if not self.records:
+            self._matrix = None
+            self._chunks = []
+            self._norms = None
+            return
+        import numpy as np
+        vectors = []
+        chunks = []
+        for vector, chunk in self.records.values():
+            vectors.append(vector)
+            chunks.append(chunk)
+        self._matrix = np.array(vectors, dtype=np.float32)
+        self._chunks = chunks
+        norms = np.linalg.norm(self._matrix, axis=1)
+        norms[norms == 0.0] = 1.0
+        self._norms = norms
 
     def upsert(self, records: Iterable[tuple[str, list[float], Chunk]]) -> None:
         for record_id, vector, chunk in records:
             if len(vector) != self.dim:
                 raise ValueError(f"Expected {self.dim}-dimensional vector, got {len(vector)}")
             self.records[record_id] = (list(vector), chunk)
+        self._build_cache()
 
     def search(self, vector: list[float], limit: int = 10) -> list[tuple[Chunk, float]]:
-        ranked = [
-            (chunk, cosine_similarity(vector, stored_vector))
-            for stored_vector, chunk in self.records.values()
-        ]
-        ranked.sort(key=lambda item: item[1], reverse=True)
-        return ranked[: max(0, limit)]
+        if self._matrix is None or len(self._chunks) == 0:
+            self._build_cache()
+            if self._matrix is None or len(self._chunks) == 0:
+                return []
+        import numpy as np
+        query = np.array(vector, dtype=np.float32)
+        q_norm = np.linalg.norm(query)
+        if q_norm == 0.0:
+            q_norm = 1.0
+        dots = self._matrix.dot(query)
+        sims = dots / (self._norms * q_norm)
+        top_k = min(len(self._chunks), max(0, limit))
+        if top_k == 0:
+            return []
+        indices = np.argsort(sims)[::-1][:top_k]
+        return [(self._chunks[idx], float(sims[idx])) for idx in indices]
 
     def save(self, path: str | Path) -> None:
         destination = Path(path)

@@ -36,9 +36,15 @@ class SimpleBM25:
         self.documents = [tokens(chunk.text) for chunk in chunks]
         self.doc_count = len(self.documents)
         self.avgdl = sum(len(doc) for doc in self.documents) / max(1, self.doc_count)
+        
+        self.doc_term_counts = []
         self.doc_freq: dict[str, int] = {}
         for document in self.documents:
-            for term in set(document):
+            counts: dict[str, int] = {}
+            for term in document:
+                counts[term] = counts.get(term, 0) + 1
+            self.doc_term_counts.append(counts)
+            for term in counts.keys():
                 self.doc_freq[term] = self.doc_freq.get(term, 0) + 1
 
     def score(self, query: str) -> dict[str, float]:
@@ -47,10 +53,7 @@ class SimpleBM25:
             return {chunk.id: 0.0 for chunk in self.chunks}
         k1, b = 1.5, 0.75
         scores: dict[str, float] = {}
-        for chunk, document in zip(self.chunks, self.documents):
-            counts: dict[str, int] = {}
-            for term in document:
-                counts[term] = counts.get(term, 0) + 1
+        for chunk, document, counts in zip(self.chunks, self.documents, self.doc_term_counts):
             total = 0.0
             for term in query_terms:
                 frequency = counts.get(term, 0)
@@ -78,6 +81,8 @@ class HybridRetriever:
             chunks = [chunk for _, chunk in self.store.records.values()]
         else:
             chunks = []
+        if hasattr(self, "chunks") and len(self.chunks) == len(chunks):
+            return
         self.chunks = chunks
         self.bm25 = SimpleBM25(chunks)
 

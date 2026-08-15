@@ -125,8 +125,12 @@ class RAGOrchestrator:
             )
 
         contexts = [result.chunk.text for result in results[:3]]
+        mode = request.metadata.get("mode") or "generative"
         try:
-            answer = self._step("generation", lambda: self.answer_generator.generate(query, contexts), timings, attempts)
+            if mode == "fast":
+                answer = self._step("generation", lambda: self.fallback_generator.generate(query, contexts), timings, attempts)
+            else:
+                answer = self._step("generation", lambda: self.answer_generator.generate(query, contexts), timings, attempts)
         except Exception as primary_error:
             try:
                 answer = self._step("generation_fallback", lambda: self.fallback_generator.generate(query, contexts), timings, attempts)
