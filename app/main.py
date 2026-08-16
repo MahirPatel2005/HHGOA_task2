@@ -212,7 +212,7 @@ def create_orchestrator() -> RAGOrchestrator:
 def create_app(orchestrator: RAGOrchestrator | None = None) -> FastAPI:
     app = FastAPI(title="HH Goa Voice RAG", version="0.1.0")
     configured_origins = [origin.strip().rstrip("/") for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
-    if not configured_origins or configured_origins == ["*"]:
+    if not configured_origins:
         configured_origins = ["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:8001", "http://127.0.0.1:8001"]
     app.add_middleware(
         CORSMiddleware,
