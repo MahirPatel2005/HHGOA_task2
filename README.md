@@ -4,19 +4,19 @@ Vaani is a voice-enabled Retrieval-Augmented Generation system for **HH Goa 2026
 
 ## Live demo
 
-**Website:** <https://vaani-voice-rag.vercel.app>
+**Website:** <https://frontend-ruby-ten-553urxydwt.vercel.app>
 
-**Backend health:** <https://vaani-voice-rag.onrender.com/health>
+**Backend health:** <https://vaani-rag-api.onrender.com/health>
 
 ## Organizer requirements implemented
 
 | Requirement | Implementation |
 |---|---|
-| Voice input and speech-to-text | Browser `MediaRecorder` with Sarvam Saaras (`saaras:v4`) |
-| MSMARCO-XI corpus | Hugging Face ingestion with all 14 Indic language configurations |
+| Voice input and speech-to-text | Browser `MediaRecorder` with ElevenLabs Scribe STT API |
+| MSMARCO-XI corpus | Ingested all 14 Indic language configurations (102,232 vector points) |
 | Broad chunking design | Paragraph, overlapping sentence-window, overlapping token, semantic-boundary, and metadata-aware views |
-| Vector retrieval | Qdrant Cloud adapter with persistent collection support; local vector-store adapter for development |
-| Answer generation | Ollama Cloud native `/api/chat` adapter (`gpt-oss:120b` by default) |
+| Vector retrieval | Qdrant Cloud adapter with persistent collection support |
+| Answer generation | Anthropic Claude API (`claude-3-5-sonnet-20241022`) |
 | Harness | Typed requests/responses, request IDs, retries, timeouts, fallbacks, stage timings, and structured errors |
 | Guardrails | Unsafe-input and prompt-injection blocking, retrieval sufficiency checks, citation checks, grounding checks, and abstention |
 | Latency analytics | Reproducible benchmark reporting P50/P70/P100 and raw per-query rows |
@@ -27,7 +27,7 @@ Vaani is a voice-enabled Retrieval-Augmented Generation system for **HH Goa 2026
 Browser microphone or typed question
         │
         ▼
-Sarvam Saaras speech-to-text
+ElevenLabs Scribe / Web Speech API
         │
         ▼
 Input guardrails and typed orchestration
@@ -37,7 +37,7 @@ Input guardrails and typed orchestration
         └── Reciprocal-rank fusion and lightweight reranking
         │
         ▼
-Ollama Cloud grounded answer generation
+Anthropic Claude grounded answer generation
         │
         ▼
 Citation and grounding validation
@@ -90,20 +90,16 @@ cp .env.example .env
 For the cloud deployment, configure these values in Render's private environment settings:
 
 ```env
-SARVAM_API_KEY=your_sarvam_key
-OLLAMA_API_KEY=your_ollama_cloud_key
-HF_TOKEN=your_huggingface_read_token
+STT_PROVIDER=elevenlabs
+ELEVENLABS_API_KEY=your_elevenlabs_key
+ANTHROPIC_API_KEY=your_anthropic_key
+GENERATION_PROVIDER=anthropic
+VECTOR_BACKEND=qdrant
 QDRANT_URL=your_qdrant_cloud_url
 QDRANT_API_KEY=your_qdrant_api_key
-
-SARVAM_MODEL=saaras:v4
-GENERATION_PROVIDER=ollama
-OLLAMA_MODEL=gpt-oss:120b
-OLLAMA_BASE_URL=https://ollama.com
-VECTOR_BACKEND=qdrant
-QDRANT_COLLECTION=voice_rag_demo
-EMBEDDING_BACKEND=sentence-transformers
-EMBEDDING_MODEL=intfloat/multilingual-e5-small
+QDRANT_COLLECTION=voice_rag_hash
+EMBEDDING_BACKEND=hash
+ALLOWED_HOSTS=*
 ```
 
 Provider keys are backend secrets. They must not appear in `frontend/runtime-config.js`, Vercel files, GitHub source files, screenshots, or videos.
