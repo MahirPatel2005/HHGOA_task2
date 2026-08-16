@@ -8,3 +8,5 @@ storage/qdrant/
 benchmarks/*.json
 *.pyc
 *.egg-info/
+.env.production
+.vercel
