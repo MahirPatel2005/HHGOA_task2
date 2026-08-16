@@ -46,7 +46,7 @@ class TextQuery(BaseModel):
 
     query: str = Field(min_length=1, max_length=2000)
     language_code: str = Field(default="unknown", max_length=32)
-    mode: str = Field(default="generative", max_length=32)
+    mode: str = Field(default="fast", max_length=32)
 
 
 def load_jsonl_documents(path: Path) -> list[Document]:

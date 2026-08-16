@@ -125,7 +125,7 @@ class RAGOrchestrator:
             )
 
         contexts = [result.chunk.text for result in results[:3]]
-        mode = request.metadata.get("mode") or "generative"
+        mode = request.metadata.get("mode") or "fast"
         try:
             if mode == "fast":
                 answer = self._step("generation", lambda: self.fallback_generator.generate(query, contexts), timings, attempts)
