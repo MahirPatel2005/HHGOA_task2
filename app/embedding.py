@@ -61,7 +61,7 @@ class SentenceTransformerEmbedder:
             raise RuntimeError(
                 "Install the production extras to use sentence-transformers"
             ) from exc
-        device = "cpu"
+        device = "mps" if torch.backends.mps.is_available() else "cpu"
         print(f"Loading SentenceTransformer '{model_name}' on device '{device}'...")
         self.model = SentenceTransformer(model_name, device=device)
         self.dim = int(self.model.get_sentence_embedding_dimension())
