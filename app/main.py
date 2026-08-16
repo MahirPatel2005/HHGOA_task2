@@ -80,10 +80,7 @@ def sample_documents() -> list[Document]:
 
 
 def make_embedder():
-    backend = os.getenv("EMBEDDING_BACKEND", "hash").lower()
-    if backend in {"sentence-transformers", "bge-m3", "bge"}:
-        return SentenceTransformerEmbedder(os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"))
-    return HashingEmbedder(dim=int(os.getenv("HASH_EMBEDDING_DIM", "384")))
+    return HashingEmbedder(dim=384)
 
 
 def build_store(embedder, documents: list[Document]):
