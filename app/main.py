@@ -80,6 +80,10 @@ def sample_documents() -> list[Document]:
 
 
 def make_embedder():
+    backend = os.getenv("EMBEDDING_BACKEND", "hash").lower()
+    if backend == "sentence-transformers" or backend == "sentence_transformers":
+        model_name = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+        return SentenceTransformerEmbedder(model_name)
     return HashingEmbedder(dim=384)
 
 

@@ -1050,7 +1050,15 @@
       });
       function tickClock() { const now = new Date(); const value = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); if ($('clock')) $('clock').textContent = value; }
       tickClock(); setInterval(tickClock, 1000);
-      fetch(api('/api/config')).then(response => response.json()).then(config => { sttProvider = config.stt_provider || ''; $('configBadge').textContent = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'RAG'}`; $('configBadge').title = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'GENERATOR'}`; }).catch(() => { $('configBadge').textContent = 'LOCAL DEMO'; });
+      fetch(api('/api/config')).then(response => response.json()).then(config => {
+        sttProvider = config.stt_provider || '';
+        $('configBadge').textContent = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'RAG'}`;
+        $('configBadge').title = `${config.stt_provider || 'STT'} · ${config.generation_provider || 'GENERATOR'}`;
+        if (sttProvider && sttProvider !== 'not configured' && sttProvider !== 'Unavailable') {
+          const cloudRadio = document.querySelector('input[name="stt_source"][value="cloud"]');
+          if (cloudRadio) cloudRadio.checked = true;
+        }
+      }).catch(() => { $('configBadge').textContent = 'LOCAL_DEMO'; });
       window.addEventListener('pointermove', event => { document.documentElement.style.setProperty('--mx', `${event.clientX}px`); document.documentElement.style.setProperty('--my', `${event.clientY}px`); });
     })();
   </script>

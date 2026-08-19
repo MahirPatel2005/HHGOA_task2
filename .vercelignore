@@ -1,4 +1,5 @@
 # Ignore all backend and storage files to speed up frontend deployment
-*
-!frontend/
+/*
+!/frontend
+!/frontend/**
 !vercel.json

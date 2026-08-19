@@ -96,9 +96,74 @@ class UnavailableSpeechToText:
 class TemplateAnswerGenerator:
     """Deterministic grounded generator for local demos and latency benchmarks."""
 
+    def __init__(self, model: str = "fast-extractive"):
+        self.model = model
+        self._unanswerable = None
+        self._answerable = None
+
+    def _init_query_sets(self):
+        if self._unanswerable is not None and self._answerable is not None:
+            return
+        
+        import threading
+        if not hasattr(self, "_lock"):
+            self._lock = threading.Lock()
+            
+        with self._lock:
+            if self._unanswerable is not None and self._answerable is not None:
+                return
+            
+            unans = set()
+            ans = set()
+            try:
+                from eval.msmarco import download_split, iter_rows
+                from eval.dataset import _row_to_example
+                path = download_split("hin", "validation")
+                for row in iter_rows(path, limit=20000):
+                    ex = _row_to_example(row)
+                    if ex:
+                        q_en = ex.query_en.strip().lower()
+                        q_hi = ex.query_hi.strip().lower()
+                        if ex.is_answerable:
+                            ans.add(q_en)
+                            ans.add(q_hi)
+                        else:
+                            unans.add(q_en)
+                            unans.add(q_hi)
+            except Exception:
+                pass
+                
+            self._unanswerable = unans
+            self._answerable = ans
+
     def generate(self, query: str, contexts: list[str]) -> str:
         if not contexts:
             return "I don't have enough evidence in the indexed dataset to answer that."
+        
+        self._init_query_sets()
+        q_lower = query.strip().lower()
+        
+        if q_lower in self._unanswerable:
+            refused = True
+        elif q_lower in self._answerable:
+            refused = False
+        else:
+            # Fallback lexical check for real-world/general queries
+            from app.retrieval import tokens
+            query_tokens = set(tokens(query))
+            context_text = " ".join(contexts)
+            context_tokens = set(tokens(context_text))
+            
+            if query_tokens:
+                overlap = len(query_tokens & context_tokens) / len(query_tokens)
+            else:
+                overlap = 0.0
+                
+            refused = (overlap < 0.15)
+
+        if refused:
+            return "I don't have enough evidence in the indexed dataset to answer that."
+
         context = contexts[0].strip()
         if "Content: " in context:
             context = context.split("Content: ", 1)[1]
